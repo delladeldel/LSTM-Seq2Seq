@@ -7,7 +7,7 @@ from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
 
 # Load model dan scaler
-model = load_model("model_seq2seq.h5")
+model = load_model("my_model.keras")
 scaler = "scaler.joblib"
 
 st.title("LSTM Seq2Seq Forecasting")
