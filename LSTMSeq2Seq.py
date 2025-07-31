@@ -1,34 +1,58 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
-import matplotlib.pyplot as plt
 
 # Load model dan scaler
-model = load_model("my_model.keras")
-scaler = "scaler.joblib"
+MODEL_PATH = "my_model.keras"
+model = load_model(MODEL_PATH)
 
-st.title("LSTM Seq2Seq Forecasting")
+st.title("LSTM Seq2Seq - Time Series Forecasting")
 
 uploaded_file = st.file_uploader("Upload CSV file", type="csv")
+
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
-    df['ddate'] = pd.to_datetime(df['ddate'])
 
-    # Preprocessing & scaling
-    data = df['tag_value'].values[-60:]
-    data = np.array(data).reshape(-1, 1)
-    data_scaled = scaler.transform(data)
-    data_scaled = data_scaled.reshape(1, 60, 1)
+    if 'ddate' not in df.columns or 'tag_value' not in df.columns:
+        st.error("File harus memiliki kolom 'ddate' dan 'tag_value'")
+    else:
+        df['ddate'] = pd.to_datetime(df['ddate'])
+        df = df.sort_values('ddate')
 
-    # Prediksi
-    decoder_input = np.zeros((1, 60, 1))  # decoder dummy
-    prediction = model.predict([data_scaled, decoder_input])[0]
+        # Tampilkan data mentah
+        st.subheader("Preview Data")
+        st.dataframe(df.tail(10))
 
-    # Inverse transform
-    prediction_inv = scaler.inverse_transform(prediction)
+        # Ambil 60 data terakhir
+        data = df['tag_value'].values[-60:]
 
-    # Plot
-    st.line_chart(prediction_inv)
+        # Normalisasi
+        scaler = MinMaxScaler()
+        # Fit menggunakan seluruh data (atau bisa pakai training data yang sama dengan training model)
+        scaler.fit(df['tag_value'].values.reshape(-1, 1))
+
+        data = np.array(data).reshape(-1, 1)
+        data_scaled = scaler.transform(data)
+        data_scaled = data_scaled.reshape(1, 60, 1)
+
+        # Dummy decoder input
+        decoder_input = np.zeros((1, 60, 1))
+
+        # Prediksi
+        prediction_scaled = model.predict([data_scaled, decoder_input])
+        prediction = scaler.inverse_transform(prediction_scaled[0])
+
+        # Tampilkan hasil prediksi
+        st.subheader("Hasil Prediksi 60 Langkah ke Depan")
+        fig, ax = plt.subplots()
+        ax.plot(range(1, 61), prediction, label='Predicted')
+        ax.set_xlabel("Time Step")
+        ax.set_ylabel("Tag Value")
+        ax.legend()
+        st.pyplot(fig)
+
+        st.write("\nPrediksi (terakhir 10 nilai):")
+        st.write(prediction[-10:])
