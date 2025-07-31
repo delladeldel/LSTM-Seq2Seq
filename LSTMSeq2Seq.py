@@ -5,10 +5,14 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
 from datetime import timedelta
+import joblib
 
 # Load model dan scaler
 MODEL_PATH = "my_model.keras"
+SCALER_PATH = "scaler.joblib"
+
 model = load_model(MODEL_PATH)
+scaler = joblib.load(SCALER_PATH)
 
 st.title("LSTM Seq2Seq - Time Series Forecasting")
 
@@ -31,10 +35,7 @@ if uploaded_file is not None:
         data = df['tag_value'].values[-60:]
         last_timestamp = df['ddate'].values[-1]
 
-        # Normalisasi
-        scaler = MinMaxScaler()
-        scaler.fit(df['tag_value'].values.reshape(-1, 1))
-
+        # Normalisasi dengan scaler yang dimuat dari file
         data = np.array(data).reshape(-1, 1)
         data_scaled = scaler.transform(data)
         data_scaled = data_scaled.reshape(1, 60, 1)
