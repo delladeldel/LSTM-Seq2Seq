@@ -1,44 +1,34 @@
+# app.py
 import streamlit as st
-import numpy as np
 import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
-import joblib
+import matplotlib.pyplot as plt
 
 # Load model dan scaler
-model = load_model('my_model.keras')
-scaler = joblib.load('scaler.joblib')
+model = load_model("model_seq2seq.h5")
+scaler = "scaler.joblib"
 
-st.title("LSTM Time Series Forecasting")
+st.title("LSTM Seq2Seq Forecasting")
 
-# Upload file input
-uploaded_file = st.file_uploader("Upload CSV file (data terbaru, minimal 60 data terakhir)", type=["csv"])
-
+uploaded_file = st.file_uploader("Upload CSV file", type="csv")
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
+    df['ddate'] = pd.to_datetime(df['ddate'])
 
-    st.subheader("Data yang Diupload")
-    st.write(df.tail(10))
+    # Preprocessing & scaling
+    data = df['tag_value'].values[-60:]
+    data = np.array(data).reshape(-1, 1)
+    data_scaled = scaler.transform(data)
+    data_scaled = data_scaled.reshape(1, 60, 1)
 
-    # Cek minimal 60 data
-    if df.shape[0] < 60:
-        st.error("Data minimal harus memiliki 60 baris untuk prediksi.")
-    else:
-        # Ambil 60 data terakhir
-        data_input = df.tail(60).values
-        data_scaled = scaler.transform(data_input)
+    # Prediksi
+    decoder_input = np.zeros((1, 60, 1))  # decoder dummy
+    prediction = model.predict([data_scaled, decoder_input])[0]
 
-        # Reshape untuk model: (1, 60, n_features)
-        data_reshaped = np.reshape(data_scaled, (1, data_scaled.shape[0], data_scaled.shape[1]))
+    # Inverse transform
+    prediction_inv = scaler.inverse_transform(prediction)
 
-        # Prediksi
-        prediction_scaled = model.predict(data_reshaped)
-
-        # Invers transform hasil prediksi
-        prediction = scaler.inverse_transform(prediction_scaled)
-
-        st.subheader("Hasil Prediksi")
-        st.write(pd.DataFrame(prediction, columns=df.columns))
-
-        # Download hasil prediksi
-        csv = pd.DataFrame(prediction, columns=df.columns).to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Hasil Prediksi", csv, file_name="prediction.csv", mime='text/csv')
+    # Plot
+    st.line_chart(prediction_inv)
