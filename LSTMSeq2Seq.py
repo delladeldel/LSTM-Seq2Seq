@@ -2,21 +2,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
-from datetime import timedelta
 import joblib
+from datetime import timedelta
 
 # Load model dan scaler
-MODEL_PATH = "my_model.keras"
-SCALER_PATH = "scaler.joblib"
+encoder_model = load_model("encoder_model.h5")
+decoder_model = load_model("decoder_model.h5")
+scaler = joblib.load("scaler.joblib")
 
-model = load_model(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
+input_len = 60
+output_len = 60
+n_features = 1
 
-st.title("LSTM Seq2Seq - Time Series Forecasting")
+st.title("LSTM Seq2Seq (Encoder-Decoder) Forecasting")
 
-uploaded_file = st.file_uploader("Upload CSV file", type="csv")
+uploaded_file = st.file_uploader("Upload file CSV", type="csv")
 
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
@@ -27,49 +28,51 @@ if uploaded_file is not None:
         df['ddate'] = pd.to_datetime(df['ddate'])
         df = df.sort_values('ddate')
 
-        # Tampilkan data mentah
         st.subheader("Preview Data")
         st.dataframe(df.tail(10))
 
         # Ambil 60 data terakhir
-        data = df['tag_value'].values[-60:]
-        last_timestamp = df['ddate'].values[-1]
+        data_input = df['tag_value'].values[-input_len:]
+        last_ddate = df['ddate'].iloc[-1]
 
         # Normalisasi dan reshape
-        data = np.array(data).reshape(-1, 1)
-        data_scaled = scaler.transform(data)
-        data_scaled = data_scaled.reshape(1, 60, 1)
+        data_input = scaler.transform(data_input.reshape(-1, 1))
+        encoder_input = data_input.reshape(1, input_len, 1)
 
-        # Decoder input: autoregressive (mulai dari nol, isi dengan prediksi sebelumnya)
-        decoder_input = np.zeros((1, 60, 1))
+        # Encode input sequence
+        state_h, state_c = encoder_model.predict(encoder_input)
+        states = [state_h, state_c]
+
+        # Decoder input awal (0)
+        decoder_input = np.zeros((1, 1, 1))
+
         predictions_scaled = []
 
-        for i in range(60):
-            pred_scaled = model.predict([data_scaled, decoder_input], verbose=0)
-            pred_value = pred_scaled[0, i, 0]
+        for i in range(output_len):
+            pred, h, c = decoder_model.predict([decoder_input] + states)
+            pred_value = pred[0, 0, 0]
             predictions_scaled.append(pred_value)
-            if i < 59:
-                decoder_input[0, i + 1, 0] = pred_value
+
+            # Update decoder input dan state
+            decoder_input = np.array(pred_value).reshape(1, 1, 1)
+            states = [h, c]
 
         # Inverse transform hasil prediksi
-        prediction = scaler.inverse_transform(np.array(predictions_scaled).reshape(-1, 1))
+        predictions = scaler.inverse_transform(np.array(predictions_scaled).reshape(-1, 1))
 
-        # Buat rentang waktu untuk hasil prediksi
-        last_ddate = df['ddate'].iloc[-1]
+        # Buat rentang waktu prediksi
         time_interval = df['ddate'].diff().mode()[0] if df['ddate'].diff().mode().size > 0 else timedelta(seconds=10)
-        future_dates = [last_ddate + (i+1)*time_interval for i in range(60)]
-        pred_df = pd.DataFrame({"ddate": future_dates, "predicted_value": prediction.flatten()})
+        future_dates = [last_ddate + (i + 1) * time_interval for i in range(output_len)]
+        pred_df = pd.DataFrame({'ddate': future_dates, 'predicted_value': predictions.flatten()})
 
-        # Tampilkan hasil prediksi
-        st.subheader("Hasil Prediksi 60 Langkah ke Depan")
+        # Plot
+        st.subheader("Prediksi 60 Langkah ke Depan")
         fig, ax = plt.subplots()
         ax.plot(df['ddate'].iloc[-200:], df['tag_value'].iloc[-200:], label='Data Historis')
-        ax.plot(pred_df['ddate'], pred_df['predicted_value'], label='Predicted', color='red')
-        ax.set_xlabel("Datetime")
-        ax.set_ylabel("Tag Value")
+        ax.plot(pred_df['ddate'], pred_df['predicted_value'], label='Prediksi', color='red')
         ax.legend()
         plt.xticks(rotation=45)
         st.pyplot(fig)
 
-        st.write("\nPrediksi (terakhir 10 nilai):")
+        st.subheader("Prediksi Terakhir")
         st.dataframe(pred_df.tail(10))
