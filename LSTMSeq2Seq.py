@@ -8,8 +8,8 @@ from datetime import timedelta
 import joblib
 
 # Load model dan scaler
-MODEL_PATH = "model_seq2seq.h5"
-SCALER_PATH = "scaler.pkl"
+MODEL_PATH = "my_model.keras"
+SCALER_PATH = "scaler.joblib"
 
 model = load_model(MODEL_PATH)
 scaler = joblib.load(SCALER_PATH)
