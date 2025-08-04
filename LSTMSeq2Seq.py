@@ -74,5 +74,5 @@ if uploaded_file is not None:
         plt.xticks(rotation=45)
         st.pyplot(fig)
 
-        st.subheader("Prediksi Terakhir")
-        st.dataframe(pred_df.tail(10))
+        st.subheader("Prediksi data")
+        st.dataframe(pred_df))
