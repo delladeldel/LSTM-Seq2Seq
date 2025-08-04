@@ -75,4 +75,4 @@ if uploaded_file is not None:
         st.pyplot(fig)
 
         st.subheader("Prediksi data")
-        st.dataframe(pred_df))
+        st.dataframe(pred_df)
