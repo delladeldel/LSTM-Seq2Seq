@@ -2,13 +2,20 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from tensorflow.keras.models import load_model
+import tensorflow as tf
 import joblib
 from datetime import timedelta
 
-# Load model dan scaler
-encoder_model = load_model("encoder_model.h5")
-decoder_model = load_model("decoder_model.h5")
+encoder_model = tf.keras.models.load_model(
+    "encoder_model.h5",
+    compile=False
+)
+
+decoder_model = tf.keras.models.load_model(
+    "decoder_model.h5",
+    compile=False
+)
+
 scaler = joblib.load("scaler.joblib")
 
 input_len = 60
